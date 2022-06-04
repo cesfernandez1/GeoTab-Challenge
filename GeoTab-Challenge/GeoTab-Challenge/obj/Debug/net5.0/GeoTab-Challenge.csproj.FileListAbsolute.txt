@@ -19,4 +19,3 @@ C:\GIT\GeoTab-Challenge\GeoTab-Challenge\GeoTab-Challenge\obj\Debug\net5.0\GeoTa
 C:\GIT\GeoTab-Challenge\GeoTab-Challenge\GeoTab-Challenge\obj\Debug\net5.0\ref\GeoTab-Challenge.dll
 C:\GIT\GeoTab-Challenge\GeoTab-Challenge\GeoTab-Challenge\obj\Debug\net5.0\GeoTab-Challenge.pdb
 C:\GIT\GeoTab-Challenge\GeoTab-Challenge\GeoTab-Challenge\obj\Debug\net5.0\GeoTab-Challenge.genruntimeconfig.cache
-C:\GIT\GeoTab-Challenge\GeoTab-Challenge\GeoTab-Challenge\obj\Debug\net5.0\GeoTab-Challenge.csprojAssemblyReference.cache
