@@ -27,6 +27,65 @@ namespace GeoTab_Challenge
             try
             {
                 await api.AuthenticateAsync();
+
+                if (!Directory.Exists(folder))
+                    Directory.CreateDirectory(folder);
+
+                while (true)
+                {
+                    Console.WriteLine("Downloading data...");
+
+                    List<Device> devices = await api.CallAsync<List<Device>>("Get", typeof(Device));
+
+                    foreach (GoDevice device in devices)
+                    {
+                        string filename = device.SerialNumber + ".csv";
+                        string path = Path.Combine(folder, filename);
+                        if (!File.Exists(path))
+                        {
+                            using (FileStream fs = File.Create(path)) ;
+
+                            //Headers of the CSV File
+                            File.WriteAllText(path, "ID,Timestamp,VIN,Coordinates,Odometer \n");
+                        }
+
+                        var results = await api.CallAsync<List<DeviceStatusInfo>>("Get", typeof(DeviceStatusInfo), new
+                        {
+                            search = new DeviceStatusInfoSearch
+                            {
+                                DeviceSearch = new DeviceSearch
+                                {
+                                    Id = device.Id
+                                }
+                            }
+                        });
+
+                        if (results.Count <= 0)
+                        {
+                            continue;
+                        }
+
+                        var statusDataSearch = new StatusDataSearch
+                        {
+                            DeviceSearch = new DeviceSearch(device.Id),
+                            DiagnosticSearch = new DiagnosticSearch(KnownId.DiagnosticOdometerAdjustmentId),
+                            FromDate = DateTime.MaxValue
+                        };
+
+                        IList<StatusData> statusData = await api.CallAsync<IList<StatusData>>("Get", typeof(StatusData), new { search = statusDataSearch });
+
+                        var odometerREadings = statusData[0].Data ?? 0;
+
+                        DeviceStatusInfo deviceStatus = results[0];
+
+                        WriteCSVFile(device, deviceStatus, odometerREadings, path);
+
+                        Console.WriteLine("Device {0} data downloaded and dumped to the file", device.Id);
+
+                    }
+
+                    Thread.Sleep(1000);
+                }
             }
             catch (InvalidUserException)
             {
@@ -40,76 +99,26 @@ namespace GeoTab_Challenge
                 Console.WriteLine(" Database not found");
                 return;
             }
-
-            if (!Directory.Exists(folder))
-                Directory.CreateDirectory(folder);
-
-
-            while (true)
+            catch (Exception e)
             {
-                Console.WriteLine("Downloading data...");
-
-                List<Device> devices = await api.CallAsync<List<Device>>("Get", typeof(Device));
-
-                foreach (GoDevice device in devices)
-                {
-                    string filename = device.SerialNumber + ".csv";
-                    string path = Path.Combine(folder, filename);
-                    if (!File.Exists(path))
-                    {
-                        using (FileStream fs = File.Create(path)) ;
-
-                        //string csvHeader = string.Format(", {1}", );
-
-                        File.WriteAllText(path, "ID,Timestamp, VIN,Coordinates,Odometer \n");
-                    }
-
-                    var results = await api.CallAsync<List<DeviceStatusInfo>>("Get", typeof(DeviceStatusInfo), new
-                    {
-                        search = new DeviceStatusInfoSearch
-                        {
-                            DeviceSearch = new DeviceSearch
-                            {
-                                Id = device.Id
-                            }
-                        }
-                    });
-
-                    if(results.Count <= 0)
-                    {
-                        continue;
-                    }
-
-                    var statusDataSearch = new StatusDataSearch
-                    {
-                        DeviceSearch = new DeviceSearch(device.Id),
-                        DiagnosticSearch = new DiagnosticSearch(KnownId.DiagnosticOdometerAdjustmentId),
-                        FromDate = DateTime.MaxValue
-                    };
-
-                    // Retrieve the odometer status data
-                    IList<StatusData> statusData = await api.CallAsync<IList<StatusData>>("Get", typeof(StatusData), new { search = statusDataSearch });
-
-                    var odometerREadings = statusData[0].Data ?? 0;
-
-                    DeviceStatusInfo deviceStatus = results[0];
-
-                    var isMetric = RegionInfo.CurrentRegion.IsMetric;
-
-
-                    using (StreamWriter writer = new StreamWriter(path, true))
-                    {
-                        string coordinates = string.Format("(xy) {0}   {1}", deviceStatus.Latitude, deviceStatus.Longitude);
-
-                        var odometer = Math.Round(isMetric ? odometerREadings : Distance.ToImperial(odometerREadings / 1000), 0);
-
-                        writer.WriteLine($"{device.Id}, {DateTime.Now} , {device.SerialNumber} , {coordinates} , {odometer}");
-                    };
-                }
-
-                Thread.Sleep(1000);
+                Console.WriteLine(e.ToString());
             }
+        }
 
+        private static void WriteCSVFile(GoDevice device, DeviceStatusInfo deviceStatus, double odometerREadings, string fileName)
+        {
+            var isMetric = RegionInfo.CurrentRegion.IsMetric;
+
+            using (StreamWriter writer = new StreamWriter(fileName, true))
+            {
+                string coordinates = string.Format("{0}   {1}", deviceStatus.Latitude, deviceStatus.Longitude);
+
+                var odometer = Math.Round(isMetric ? odometerREadings : Distance.ToImperial(odometerREadings / 1000), 0);
+
+                string VIN = !string.IsNullOrEmpty(device.VehicleIdentificationNumber) ? device.VehicleIdentificationNumber : device.SerialNumber;
+
+                writer.WriteLine($"{device.Id}, {DateTime.Now} , {VIN} , {coordinates} , {odometer}");
+            };
         }
     }
 }
